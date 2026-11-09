@@ -241,6 +241,71 @@ fetch_scb_data <- function(tab_id, year, metadata_path) {
 
 
 
+# Normalisera regionkoder -------------------------------------------------
+# SCB använder olika koder för regioner beroende på tabell, t.ex. "01" (län)
+# i vissa tabeller men "01L" eller "20LG" (region som valkrets) i andra.
+# Funktionen:
+#  - sparar originalkoden i kolumnen <kod_col>_original
+#  - gör om tvåsiffrig kod + bokstäver (01L, 20LG) till tvåsiffrig kod (01, 20)
+#  - sätter "Region Gotland" till "09" (identifieras via etiketten)
+#  - stoppar om flera olika originalkoder blir samma kod (annars summeras
+#    de ihop i aggregeringen och ger fel värden)
+#  - varnar för koder som inte finns i listan med giltiga koder, eftersom
+#    de annars filtreras bort i tysthet
+
+normalisera_regionkod <- function(df,
+                                  kod_col = "Region_kod",
+                                  label_col = "Region",
+                                  giltiga = allregcodes) {
+  original <- as.character(df[[kod_col]])
+  ny <- original
+
+  # Tvåsiffrig kod följd av bokstäver, t.ex. 01L, 03L, 20LG -> 01, 03, 20
+  ar_regionsuffix <- grepl("^[0-9]{2}[A-Za-z]+$", original)
+  ny[ar_regionsuffix] <- substr(original[ar_regionsuffix], 1, 2)
+
+  # Specialare för Region Gotland
+  if (label_col %in% names(df)) {
+    ar_gotland <- trimws(tolower(as.character(df[[label_col]]))) == "region gotland"
+    ar_gotland[is.na(ar_gotland)] <- FALSE
+    ny[ar_gotland] <- "09"
+  }
+
+  # Kontroll: en normaliserad kod får bara komma från en originalkod
+  par <- unique(data.frame(ny = ny, original = original, stringsAsFactors = FALSE))
+  antal_per_kod <- table(par$ny)
+  krockar <- names(antal_per_kod)[antal_per_kod > 1]
+  if (length(krockar) > 0) {
+    beskrivning <- vapply(krockar, function(k) {
+      paste0(k, " <- ", paste(par$original[par$ny == k], collapse = ", "))
+    }, character(1))
+    stop(
+      "Flera olika regionkoder blir samma kod efter normalisering ",
+      "och skulle summeras ihop:\n  ",
+      paste(beskrivning, collapse = "\n  ")
+    )
+  }
+
+  # Varning: koder som inte finns i listan med giltiga koder
+  okanda <- sort(unique(ny[!ny %in% giltiga]))
+  if (length(okanda) > 0) {
+    visas <- head(okanda, 20)
+    warning(
+      length(okanda), " regionkod(er) finns inte i listan med giltiga koder ",
+      "och kommer att filtreras bort: ",
+      paste(visas, collapse = ", "),
+      if (length(okanda) > length(visas)) ", ..." else "",
+      call. = FALSE
+    )
+  }
+
+  df[[paste0(kod_col, "_original")]] <- original
+  df[[kod_col]] <- ny
+  df
+}
+
+
+
 # Hårdkodade kommun/region/riket-listan -----------------------------------
 # Används för filtrering
 allregcodes <- c(
