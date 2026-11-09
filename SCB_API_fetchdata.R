@@ -26,7 +26,7 @@ year_to_use <- "" # <---- Till exempel "2024"
 
 
 # Hämtar Kejsar Zings formelsamling ---------------------------------------
-source("https://raw.githubusercontent.com/RKAKolada/RKA_SCB_API_2.0_Interaktion/refs/heads/main/SCB_API_funktionssamling.R")
+source("https://raw.githubusercontent.com/RKA-Kolada/RKA_SCB_API_2.0_Interaktion/refs/heads/main/SCB_API_funktionssamling.R")
 
 
 # Identifierar metadatafilens plats ---------------------------------------
